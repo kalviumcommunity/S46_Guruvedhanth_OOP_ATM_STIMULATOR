@@ -49,19 +49,12 @@ public:
 };
 
 int main() {
-    BankAccount accounts[] = {
-        BankAccount("12345678", 500.0),
-        BankAccount("87654321", 1000.0),
-        BankAccount("11223344", 750.0)
-    };
+    BankAccount myAccount("12345678", 500.0);
 
-    ATM myATM(&accounts[0]);
+    ATM myATM(&myAccount);
+
     myATM.addAmount(200.0);
     myATM.withdrawAmount(100.0);
-
-    ATM anotherATM(&accounts[1]);
-    anotherATM.addAmount(300.0);
-    anotherATM.withdrawAmount(150.0);
 
     return 0;
 }
