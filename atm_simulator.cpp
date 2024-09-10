@@ -7,9 +7,16 @@ class BankAccount {
 private:
     string accountNumber;
     double balance;
+    static int accountCount;  // Static data member to keep track of account count
 
 public:
-    BankAccount(string accNum, double bal) : accountNumber(accNum), balance(bal) {}
+    BankAccount(string accNum, double bal) : accountNumber(accNum), balance(bal) {
+        accountCount++;  // Increment the count whenever a new account is created
+    }
+
+    ~BankAccount() {
+        accountCount--;  // Decrement the count when an account is deleted
+    }
 
     BankAccount& deposit(double amount) {
         this->balance += amount;
@@ -30,11 +37,19 @@ public:
     double getBalance() const {
         return this->balance;
     }
+
+    // Static member function to get the total number of accounts
+    static int getTotalAccounts() {
+        return accountCount;
+    }
 };
+
+// Initialize the static member
+int BankAccount::accountCount = 0;
 
 class ATM {
 private:
-    BankAccount* account; // Pointer to dynamically allocated BankAccount
+    BankAccount* account;
 
 public:
     ATM(BankAccount* acc) : account(acc) {}
@@ -54,6 +69,9 @@ int main() {
     BankAccount* account2 = new BankAccount("87654321", 1000.0);
     BankAccount* account3 = new BankAccount("11223344", 750.0);
 
+    // Display total accounts using the static member function
+    cout << "Total accounts created: " << BankAccount::getTotalAccounts() << endl;
+
     // Dynamically allocate ATM objects
     ATM* myATM = new ATM(account1);
     myATM->addAmount(200.0);
@@ -69,6 +87,9 @@ int main() {
     delete account1;
     delete account2;
     delete account3;
+
+    // Display total accounts after deletion
+    cout << "Total accounts remaining: " << BankAccount::getTotalAccounts() << endl;
 
     return 0;
 }
