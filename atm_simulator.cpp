@@ -11,22 +11,24 @@ private:
 public:
     BankAccount(string accNum, double bal) : accountNumber(accNum), balance(bal) {}
 
-    void deposit(double amount) {
-        balance += amount;
-        cout << "Deposited: " << amount << ". New balance: " << balance << endl;
+    BankAccount& deposit(double amount) {
+        this->balance += amount;
+        cout << "Deposited: " << amount << ". New balance: " << this->balance << endl;
+        return *this;
     }
 
-    void withdraw(double amount) {
-        if (amount > balance) {
+    BankAccount& withdraw(double amount) {
+        if (amount > this->balance) {
             cout << "Insufficient balance!" << endl;
         } else {
-            balance -= amount;
-            cout << "Withdrew: " << amount << ". Remaining balance: " << balance << endl;
+            this->balance -= amount;
+            cout << "Withdrew: " << amount << ". Remaining balance: " << this->balance << endl;
         }
+        return *this;
     }
 
     double getBalance() const {
-        return balance;
+        return this->balance;
     }
 };
 
@@ -47,12 +49,19 @@ public:
 };
 
 int main() {
-    BankAccount myAccount("12345678", 500.0);
+    BankAccount accounts[] = {
+        BankAccount("12345678", 500.0),
+        BankAccount("87654321", 1000.0),
+        BankAccount("11223344", 750.0)
+    };
 
-    ATM myATM(&myAccount);
-
+    ATM myATM(&accounts[0]);
     myATM.addAmount(200.0);
     myATM.withdrawAmount(100.0);
+
+    ATM anotherATM(&accounts[1]);
+    anotherATM.addAmount(300.0);
+    anotherATM.withdrawAmount(150.0);
 
     return 0;
 }
