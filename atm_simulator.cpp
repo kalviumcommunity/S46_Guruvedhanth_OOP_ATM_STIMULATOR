@@ -3,7 +3,7 @@
 
 using namespace std;
 
-// BankAccount class demonstrating abstraction and encapsulation
+// BankAccount class demonstrating abstraction, encapsulation, constructors, and destructor
 class BankAccount {
 private:
     string accountNumber;  // Private member to store account number
@@ -11,13 +11,21 @@ private:
     static int accountCount;  // Static private member to keep track of total accounts
 
 public:
-    // Public constructor to initialize account with an account number and balance
+    // Default constructor
+    BankAccount() : accountNumber("00000000"), balance(0.0) {
+        cout << "Default constructor called for account: " << accountNumber << endl;
+        accountCount++;  // Increment the count when a new account is created
+    }
+
+    // Parameterized constructor to initialize account with an account number and balance
     BankAccount(string accNum, double bal) : accountNumber(accNum), balance(bal) {
+        cout << "Parameterized constructor called for account: " << accountNumber << endl;
         accountCount++;  // Increment the count when a new account is created
     }
 
     // Public destructor
     ~BankAccount() {
+        cout << "Destructor called for account: " << accountNumber << endl;
         accountCount--;  // Decrement the count when an account is deleted
     }
 
@@ -76,10 +84,11 @@ public:
 };
 
 int main() {
-    // Create three bank accounts using dynamic memory allocation
-    BankAccount* account1 = new BankAccount("12345678", 500.0);
-    BankAccount* account2 = new BankAccount("87654321", 1000.0);
-    BankAccount* account3 = new BankAccount("11223344", 750.0);
+    // Demonstrating the use of the default constructor
+    BankAccount* account1 = new BankAccount();  // Default constructor will be called
+
+    // Demonstrating the use of the parameterized constructor
+    BankAccount* account2 = new BankAccount("87654321", 1000.0);  // Parameterized constructor
 
     // Display the total number of bank accounts created
     cout << "Total accounts created: " << BankAccount::getTotalAccounts() << endl;
@@ -96,9 +105,8 @@ int main() {
     // Clean up dynamically allocated memory
     delete myATM;
     delete anotherATM;
-    delete account1;
-    delete account2;
-    delete account3;
+    delete account1;  // Destructor will be called here for account1
+    delete account2;  // Destructor will be called here for account2
 
     // Display the total number of bank accounts after deletion
     cout << "Total accounts remaining: " << BankAccount::getTotalAccounts() << endl;
