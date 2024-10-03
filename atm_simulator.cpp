@@ -10,20 +10,29 @@ private:
     static int accountCount;  // Static data member to keep track of account count
 
 public:
+    // Constructor
     BankAccount(string accNum, double bal) : accountNumber(accNum), balance(bal) {
         accountCount++;  // Increment the count whenever a new account is created
     }
 
+    // Destructor
     ~BankAccount() {
         accountCount--;  // Decrement the count when an account is deleted
     }
 
+    // Accessor (Getter) to get balance
+    double getBalance() const {
+        return this->balance;
+    }
+
+    // Mutator (Setter) to deposit amount
     BankAccount& deposit(double amount) {
         this->balance += amount;
         cout << "Deposited: " << amount << ". New balance: " << this->balance << endl;
         return *this;
     }
 
+    // Mutator (Setter) to withdraw amount
     BankAccount& withdraw(double amount) {
         if (amount > this->balance) {
             cout << "Insufficient balance!" << endl;
@@ -32,10 +41,6 @@ public:
             cout << "Withdrew: " << amount << ". Remaining balance: " << this->balance << endl;
         }
         return *this;
-    }
-
-    double getBalance() const {
-        return this->balance;
     }
 
     // Static member function to get the total number of accounts
@@ -52,12 +57,15 @@ private:
     BankAccount* account;
 
 public:
+    // Constructor
     ATM(BankAccount* acc) : account(acc) {}
 
+    // Encapsulated method to deposit money
     void addAmount(double amount) {
         account->deposit(amount);
     }
 
+    // Encapsulated method to withdraw money
     void withdrawAmount(double amount) {
         account->withdraw(amount);
     }
