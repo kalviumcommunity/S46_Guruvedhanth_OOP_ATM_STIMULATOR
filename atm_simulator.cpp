@@ -3,91 +3,95 @@
 
 using namespace std;
 
+// BankAccount class demonstrating abstraction and encapsulation
 class BankAccount {
 private:
-    string accountNumber;
-    double balance;
-    static int accountCount;  // Static data member to keep track of account count
+    string accountNumber;  // Private member to store account number
+    double balance;        // Private member to store account balance
+    static int accountCount;  // Static private member to keep track of total accounts
 
 public:
-    // Constructor
+    // Public constructor to initialize account with an account number and balance
     BankAccount(string accNum, double bal) : accountNumber(accNum), balance(bal) {
-        accountCount++;  // Increment the count whenever a new account is created
+        accountCount++;  // Increment the count when a new account is created
     }
 
-    // Destructor
+    // Public destructor
     ~BankAccount() {
         accountCount--;  // Decrement the count when an account is deleted
     }
 
-    // Accessor (Getter) to get balance
+    // Public accessor (getter) to retrieve the account balance
     double getBalance() const {
         return this->balance;
     }
 
-    // Mutator (Setter) to deposit amount
-    BankAccount& deposit(double amount) {
-        this->balance += amount;
-        cout << "Deposited: " << amount << ". New balance: " << this->balance << endl;
-        return *this;
+    // Public mutator (setter) to deposit amount into the account
+    void deposit(double amount) {
+        if (amount > 0) {
+            balance += amount;
+            cout << "Deposited: " << amount << ". New balance: " << balance << endl;
+        } else {
+            cout << "Deposit amount must be positive!" << endl;
+        }
     }
 
-    // Mutator (Setter) to withdraw amount
-    BankAccount& withdraw(double amount) {
-        if (amount > this->balance) {
+    // Public mutator (setter) to withdraw amount from the account
+    void withdraw(double amount) {
+        if (amount > balance) {
             cout << "Insufficient balance!" << endl;
         } else {
-            this->balance -= amount;
-            cout << "Withdrew: " << amount << ". Remaining balance: " << this->balance << endl;
+            balance -= amount;
+            cout << "Withdrew: " << amount << ". Remaining balance: " << balance << endl;
         }
-        return *this;
     }
 
-    // Static member function to get the total number of accounts
+    // Static public method to retrieve the total number of accounts
     static int getTotalAccounts() {
         return accountCount;
     }
 };
 
-// Initialize the static member
+// Initialize the static member outside the class definition
 int BankAccount::accountCount = 0;
 
+// ATM class demonstrates interaction with BankAccount using abstraction
 class ATM {
 private:
-    BankAccount* account;
+    BankAccount* account;  // Private member to hold the bank account being used
 
 public:
-    // Constructor
+    // Public constructor to associate an ATM with a bank account
     ATM(BankAccount* acc) : account(acc) {}
 
-    // Encapsulated method to deposit money
+    // Public method to deposit money into the associated account
     void addAmount(double amount) {
-        account->deposit(amount);
+        account->deposit(amount);  // Accessing BankAccount through abstraction
     }
 
-    // Encapsulated method to withdraw money
+    // Public method to withdraw money from the associated account
     void withdrawAmount(double amount) {
-        account->withdraw(amount);
+        account->withdraw(amount);  // Accessing BankAccount through abstraction
     }
 };
 
 int main() {
-    // Dynamically allocate BankAccount objects
+    // Create three bank accounts using dynamic memory allocation
     BankAccount* account1 = new BankAccount("12345678", 500.0);
     BankAccount* account2 = new BankAccount("87654321", 1000.0);
     BankAccount* account3 = new BankAccount("11223344", 750.0);
 
-    // Display total accounts using the static member function
+    // Display the total number of bank accounts created
     cout << "Total accounts created: " << BankAccount::getTotalAccounts() << endl;
 
-    // Dynamically allocate ATM objects
+    // Create ATM objects for each bank account
     ATM* myATM = new ATM(account1);
-    myATM->addAmount(200.0);
-    myATM->withdrawAmount(100.0);
+    myATM->addAmount(200.0);      // Deposit using the ATM
+    myATM->withdrawAmount(100.0); // Withdraw using the ATM
 
     ATM* anotherATM = new ATM(account2);
-    anotherATM->addAmount(300.0);
-    anotherATM->withdrawAmount(150.0);
+    anotherATM->addAmount(300.0);     // Deposit using the ATM
+    anotherATM->withdrawAmount(150.0); // Withdraw using the ATM
 
     // Clean up dynamically allocated memory
     delete myATM;
@@ -96,7 +100,7 @@ int main() {
     delete account2;
     delete account3;
 
-    // Display total accounts after deletion
+    // Display the total number of bank accounts after deletion
     cout << "Total accounts remaining: " << BankAccount::getTotalAccounts() << endl;
 
     return 0;
