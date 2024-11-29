@@ -1,143 +1,160 @@
 #include <iostream>
 #include <string>
+#include <stdexcept>
+#include <memory>
+#include <vector>
 
-using namespace std;
+// Separate logging responsibility
+class Logger {
+public:
+    static void log(const std::string& message) {
+        std::cout << message << std::endl;
+    }
 
-// Base class: BankAccount
-class BankAccount {
+    static void logError(const std::string& message) {
+        std::cerr << "ERROR: " << message << std::endl;
+    }
+};
+
+// Separate interest calculation responsibility
+class InterestCalculator {
+public:
+    static double calculateSimpleInterest(double principal, double rate, double time) {
+        return principal * (rate / 100) * time;
+    }
+};
+
+// Separate validation responsibility
+class AccountValidator {
+public:
+    static bool isValidAmount(double amount) {
+        return amount > 0;
+    }
+
+    static bool hasEnoughBalance(double balance, double amount, double overdraftLimit = 0) {
+        return amount <= (balance + overdraftLimit);
+    }
+};
+
+// Base class with minimal responsibility
+class Account {
 protected:
-    string accountNumber;  // Protected member to allow access in derived classes
-    double balance;        // Protected member for derived classes
-    static int accountCount;  // Static member to keep track of total accounts
+    std::string accountNumber;
+    double balance;
 
 public:
-    // Default constructor
-    BankAccount() : accountNumber("00000000"), balance(0.0) {
-        cout << "Default constructor called for account: " << accountNumber << endl;
-        accountCount++;
+    Account(const std::string& accNum, double initialBalance) 
+        : accountNumber(accNum), balance(initialBalance) {
+        Logger::log("Account created: " + accountNumber);
     }
 
-    // Parameterized constructor
-    BankAccount(string accNum, double bal) : accountNumber(accNum), balance(bal) {
-        cout << "Parameterized constructor called for account: " << accountNumber << endl;
-        accountCount++;
+    virtual ~Account() {
+        Logger::log("Account destroyed: " + accountNumber);
     }
 
-    // Virtual destructor for proper cleanup in inheritance
-    virtual ~BankAccount() {
-        cout << "Destructor called for account: " << accountNumber << endl;
-        accountCount--;
-    }
+    std::string getAccountNumber() const { return accountNumber; }
+    double getBalance() const { return balance; }
 
-    // Public getter for balance
-    virtual double getBalance() const {
-        return this->balance;
-    }
-
-    // Public deposit method
-    virtual void deposit(double amount) {
-        if (amount > 0) {
-            balance += amount;
-            cout << "Deposited: " << amount << ". New balance: " << balance << endl;
-        } else {
-            cout << "Deposit amount must be positive!" << endl;
-        }
-    }
-
-    // Public withdraw method (can be overridden)
-    virtual void withdraw(double amount) {
-        if (amount > balance) {
-            cout << "Insufficient balance!" << endl;
-        } else {
-            balance -= amount;
-            cout << "Withdrew: " << amount << ". Remaining balance: " << balance << endl;
-        }
-    }
-
-    // Static method to get total accounts
-    static int getTotalAccounts() {
-        return accountCount;
-    }
+    virtual void deposit(double amount) = 0;
+    virtual void withdraw(double amount) = 0;
 };
 
-// Initialize static member
-int BankAccount::accountCount = 0;
-
-// Derived class: SavingsAccount
-class SavingsAccount : public BankAccount {
+// Savings Account with focused responsibility
+class SavingsAccount : public Account {
 private:
-    double interestRate;  // Interest rate for savings account
+    double interestRate;
 
 public:
-    // Constructor for SavingsAccount
-    SavingsAccount(string accNum, double bal, double rate) 
-        : BankAccount(accNum, bal), interestRate(rate) {
-        cout << "SavingsAccount created for account: " << accountNumber << endl;
+    SavingsAccount(const std::string& accNum, double initialBalance, double rate) 
+        : Account(accNum, initialBalance), interestRate(rate) {
+        Logger::log("Savings Account created: " + accountNumber);
     }
 
-    // Method to apply interest
-    void applyInterest() {
-        double interest = balance * (interestRate / 100);
-        balance += interest;
-        cout << "Interest of " << interestRate << "% applied. New balance: " << balance << endl;
+    void deposit(double amount) override {
+        if (!AccountValidator::isValidAmount(amount)) {
+            Logger::logError("Invalid deposit amount");
+            return;
+        }
+        balance += amount;
+        Logger::log("Deposited: " + std::to_string(amount) + 
+                    ". New balance: " + std::to_string(balance));
     }
 
-    // Destructor
-    ~SavingsAccount() {
-        cout << "Destructor called for SavingsAccount: " << accountNumber << endl;
-    }
-};
-
-// Derived class: CurrentAccount
-class CurrentAccount : public BankAccount {
-private:
-    double overdraftLimit;  // Overdraft limit for current account
-
-public:
-    // Constructor for CurrentAccount
-    CurrentAccount(string accNum, double bal, double limit) 
-        : BankAccount(accNum, bal), overdraftLimit(limit) {
-        cout << "CurrentAccount created for account: " << accountNumber << endl;
-    }
-
-    // Override withdraw to include overdraft functionality
     void withdraw(double amount) override {
-        if (amount > balance + overdraftLimit) {
-            cout << "Withdrawal exceeds overdraft limit!" << endl;
-        } else {
-            balance -= amount;
-            cout << "Withdrew: " << amount << ". Remaining balance: " << balance << endl;
+        if (!AccountValidator::isValidAmount(amount)) {
+            Logger::logError("Invalid withdrawal amount");
+            return;
         }
+        if (!AccountValidator::hasEnoughBalance(balance, amount)) {
+            Logger::logError("Insufficient balance");
+            return;
+        }
+        balance -= amount;
+        Logger::log("Withdrew: " + std::to_string(amount) + 
+                    ". New balance: " + std::to_string(balance));
     }
 
-    // Destructor
-    ~CurrentAccount() {
-        cout << "Destructor called for CurrentAccount: " << accountNumber << endl;
+    void applyInterest() {
+        double interest = InterestCalculator::calculateSimpleInterest(balance, interestRate, 1);
+        balance += interest;
+        Logger::log("Interest applied. New balance: " + std::to_string(balance));
     }
 };
 
-// ATM class demonstrates interaction with BankAccount using abstraction
+// Current Account with focused responsibility
+class CurrentAccount : public Account {
+private:
+    double overdraftLimit;
+
+public:
+    CurrentAccount(const std::string& accNum, double initialBalance, double limit) 
+        : Account(accNum, initialBalance), overdraftLimit(limit) {
+        Logger::log("Current Account created: " + accountNumber);
+    }
+
+    void deposit(double amount) override {
+        if (!AccountValidator::isValidAmount(amount)) {
+            Logger::logError("Invalid deposit amount");
+            return;
+        }
+        balance += amount;
+        Logger::log("Deposited: " + std::to_string(amount) + 
+                    ". New balance: " + std::to_string(balance));
+    }
+
+    void withdraw(double amount) override {
+        if (!AccountValidator::isValidAmount(amount)) {
+            Logger::logError("Invalid withdrawal amount");
+            return;
+        }
+        if (!AccountValidator::hasEnoughBalance(balance, amount, overdraftLimit)) {
+            Logger::logError("Withdrawal exceeds overdraft limit");
+            return;
+        }
+        balance -= amount;
+        Logger::log("Withdrew: " + std::to_string(amount) + 
+                    ". New balance: " + std::to_string(balance));
+    }
+};
+
+// ATM with focused responsibility of account interaction
 class ATM {
 private:
-    BankAccount* account;  // Pointer to a BankAccount object
+    Account* account;
 
 public:
-    // Constructor
-    ATM(BankAccount* acc) : account(acc) {}
+    ATM(Account* acc) : account(acc) {}
 
-    // Deposit money
-    void addAmount(double amount) {
+    void deposit(double amount) {
         account->deposit(amount);
     }
 
-    // Withdraw money
-    void withdrawAmount(double amount) {
+    void withdraw(double amount) {
         account->withdraw(amount);
     }
 
-    // Apply specific behaviors (if applicable)
+    // Specific behavior handling
     void applySpecificBehavior() {
-        // Try dynamic_cast to check account type and apply specific behavior
         SavingsAccount* savings = dynamic_cast<SavingsAccount*>(account);
         if (savings) {
             savings->applyInterest();
@@ -145,32 +162,51 @@ public:
     }
 };
 
+// Banking system manager with responsibility of account management
+class BankingSystem {
+private:
+    std::vector<std::unique_ptr<Account>> accounts;
+
+public:
+    void addAccount(std::unique_ptr<Account> account) {
+        accounts.push_back(std::move(account));
+    }
+
+    Account* findAccount(const std::string& accountNumber) {
+        for (auto& account : accounts) {
+            if (account->getAccountNumber() == accountNumber) {
+                return account.get();
+            }
+        }
+        return nullptr;
+    }
+};
+
 int main() {
-    // Create a SavingsAccount object
-    SavingsAccount* savings = new SavingsAccount("12345678", 1000.0, 5.0);
+    // Create a banking system
+    BankingSystem bank;
 
-    // Create a CurrentAccount object
-    CurrentAccount* current = new CurrentAccount("87654321", 500.0, 200.0);
+    // Create accounts
+    auto savings = std::make_unique<SavingsAccount>("12345678", 1000.0, 5.0);
+    auto current = std::make_unique<CurrentAccount>("87654321", 500.0, 200.0);
 
-    // Display the total number of accounts created
-    cout << "Total accounts created: " << BankAccount::getTotalAccounts() << endl;
+    // Add accounts to banking system
+    bank.addAccount(std::move(savings));
+    bank.addAccount(std::move(current));
 
-    // Create ATM objects for each account
-    ATM* savingsATM = new ATM(savings);
-    savingsATM->addAmount(200.0);  // Deposit to savings account
-    savingsATM->applySpecificBehavior();  // Apply interest to savings account
+    // Find the accounts
+    SavingsAccount* savingsAccount = dynamic_cast<SavingsAccount*>(bank.findAccount("12345678"));
+    CurrentAccount* currentAccount = dynamic_cast<CurrentAccount*>(bank.findAccount("87654321"));
 
-    ATM* currentATM = new ATM(current);
-    currentATM->withdrawAmount(600.0);  // Withdraw using overdraft
+    // Create ATMs for accounts
+    ATM savingsATM(savingsAccount);
+    ATM currentATM(currentAccount);
 
-    // Clean up memory
-    delete savingsATM;
-    delete currentATM;
-    delete savings;
-    delete current;
+    // Perform operations
+    savingsATM.deposit(200.0);
+    savingsATM.applySpecificBehavior();
 
-    // Display the total number of accounts remaining
-    cout << "Total accounts remaining: " << BankAccount::getTotalAccounts() << endl;
+    currentATM.withdraw(600.0);
 
     return 0;
 }
