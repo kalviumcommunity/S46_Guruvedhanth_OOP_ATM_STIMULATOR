@@ -1,168 +1,190 @@
 #include <iostream>
 #include <string>
-#include <stdexcept>
 #include <memory>
 #include <vector>
+#include <stdexcept>
+#include <cmath>  // Added for pow() function
 
-// Separate logging responsibility
-class Logger {
+// Abstract base class for transaction fees
+class TransactionFeeStrategy {
 public:
-    static void log(const std::string& message) {
-        std::cout << message << std::endl;
-    }
+    virtual ~TransactionFeeStrategy() = default;
+    virtual double calculateFee(double amount) const = 0;
+};
 
-    static void logError(const std::string& message) {
-        std::cerr << "ERROR: " << message << std::endl;
+// Concrete fee strategies
+class NoFeeStrategy : public TransactionFeeStrategy {
+public:
+    double calculateFee(double amount) const override {
+        return 0.0;
     }
 };
 
-// Separate interest calculation responsibility
-class InterestCalculator {
+class PercentageFeeStrategy : public TransactionFeeStrategy {
+private:
+    double feeRate;
+
 public:
-    static double calculateSimpleInterest(double principal, double rate, double time) {
-        return principal * (rate / 100) * time;
+    explicit PercentageFeeStrategy(double rate) : feeRate(rate) {}
+
+    double calculateFee(double amount) const override {
+        return amount * (feeRate / 100.0);
     }
 };
 
-// Separate validation responsibility
-class AccountValidator {
-public:
-    static bool isValidAmount(double amount) {
-        return amount > 0;
-    }
+class FlatFeeStrategy : public TransactionFeeStrategy {
+private:
+    double flatFee;
 
-    static bool hasEnoughBalance(double balance, double amount, double overdraftLimit = 0) {
-        return amount <= (balance + overdraftLimit);
+public:
+    explicit FlatFeeStrategy(double fee) : flatFee(fee) {}
+
+    double calculateFee(double amount) const override {
+        return flatFee;
     }
 };
 
-// Base class with minimal responsibility
+// Abstract base class for interest calculation
+class InterestCalculationStrategy {
+public:
+    virtual ~InterestCalculationStrategy() = default;
+    virtual double calculateInterest(double balance, double rate) const = 0;
+};
+
+// Concrete interest calculation strategies
+class SimpleInterestStrategy : public InterestCalculationStrategy {
+public:
+    double calculateInterest(double balance, double rate) const override {
+        return balance * (rate / 100.0);
+    }
+};
+
+class CompoundInterestStrategy : public InterestCalculationStrategy {
+private:
+    int compoundFrequency;
+
+public:
+    explicit CompoundInterestStrategy(int frequency = 12) 
+        : compoundFrequency(frequency) {}
+
+    double calculateInterest(double balance, double rate) const override {
+        // Use std::pow from <cmath>
+        double periodRate = rate / (100.0 * compoundFrequency);
+        return balance * (std::pow(1 + periodRate, compoundFrequency) - 1);
+    }
+};
+
+// Forward declaration
+class Account;
+
+// Abstract base class for account
 class Account {
 protected:
     std::string accountNumber;
     double balance;
+    std::unique_ptr<TransactionFeeStrategy> feeStrategy;
 
 public:
-    Account(const std::string& accNum, double initialBalance) 
-        : accountNumber(accNum), balance(initialBalance) {
-        Logger::log("Account created: " + accountNumber);
+    Account(const std::string& accNum, double initialBalance, 
+            std::unique_ptr<TransactionFeeStrategy> feeStrat = std::make_unique<NoFeeStrategy>())
+        : accountNumber(accNum), balance(initialBalance), 
+          feeStrategy(std::move(feeStrat)) {}
+
+    virtual ~Account() = default;
+
+    // Virtual methods for core account operations
+    virtual void deposit(double amount) {
+        if (amount <= 0) {
+            throw std::invalid_argument("Deposit amount must be positive");
+        }
+        double fee = feeStrategy->calculateFee(amount);
+        if (fee > amount) {
+            throw std::runtime_error("Fee exceeds deposit amount");
+        }
+        balance += (amount - fee);
+        std::cout << "Deposited: " << amount 
+                  << ", Fee: " << fee 
+                  << ", New Balance: " << balance << std::endl;
     }
 
-    virtual ~Account() {
-        Logger::log("Account destroyed: " + accountNumber);
+    virtual void withdraw(double amount) {
+        if (amount <= 0) {
+            throw std::invalid_argument("Withdrawal amount must be positive");
+        }
+        double fee = feeStrategy->calculateFee(amount);
+        if (amount + fee > balance) {
+            throw std::runtime_error("Insufficient funds");
+        }
+        balance -= (amount + fee);
+        std::cout << "Withdrew: " << amount 
+                  << ", Fee: " << fee 
+                  << ", New Balance: " << balance << std::endl;
     }
 
-    std::string getAccountNumber() const { return accountNumber; }
+    // Getters
+    virtual std::string getAccountType() const = 0;
     double getBalance() const { return balance; }
-
-    virtual void deposit(double amount) = 0;
-    virtual void withdraw(double amount) = 0;
+    std::string getAccountNumber() const { return accountNumber; }
 };
 
-// Savings Account with focused responsibility
+// Concrete Account Types
 class SavingsAccount : public Account {
 private:
     double interestRate;
+    std::unique_ptr<InterestCalculationStrategy> interestStrategy;
 
 public:
-    SavingsAccount(const std::string& accNum, double initialBalance, double rate) 
-        : Account(accNum, initialBalance), interestRate(rate) {
-        Logger::log("Savings Account created: " + accountNumber);
-    }
-
-    void deposit(double amount) override {
-        if (!AccountValidator::isValidAmount(amount)) {
-            Logger::logError("Invalid deposit amount");
-            return;
-        }
-        balance += amount;
-        Logger::log("Deposited: " + std::to_string(amount) + 
-                    ". New balance: " + std::to_string(balance));
-    }
-
-    void withdraw(double amount) override {
-        if (!AccountValidator::isValidAmount(amount)) {
-            Logger::logError("Invalid withdrawal amount");
-            return;
-        }
-        if (!AccountValidator::hasEnoughBalance(balance, amount)) {
-            Logger::logError("Insufficient balance");
-            return;
-        }
-        balance -= amount;
-        Logger::log("Withdrew: " + std::to_string(amount) + 
-                    ". New balance: " + std::to_string(balance));
-    }
+    SavingsAccount(const std::string& accNum, double initialBalance, 
+                   double rate, 
+                   std::unique_ptr<TransactionFeeStrategy> feeStrat = std::make_unique<NoFeeStrategy>(),
+                   std::unique_ptr<InterestCalculationStrategy> intStrat = std::make_unique<SimpleInterestStrategy>())
+        : Account(accNum, initialBalance, std::move(feeStrat)), 
+          interestRate(rate), 
+          interestStrategy(std::move(intStrat)) {}
 
     void applyInterest() {
-        double interest = InterestCalculator::calculateSimpleInterest(balance, interestRate, 1);
+        double interest = interestStrategy->calculateInterest(balance, interestRate);
         balance += interest;
-        Logger::log("Interest applied. New balance: " + std::to_string(balance));
+        std::cout << "Interest Applied: " << interest 
+                  << ", New Balance: " << balance << std::endl;
+    }
+
+    std::string getAccountType() const override {
+        return "Savings";
     }
 };
 
-// Current Account with focused responsibility
 class CurrentAccount : public Account {
 private:
     double overdraftLimit;
 
 public:
-    CurrentAccount(const std::string& accNum, double initialBalance, double limit) 
-        : Account(accNum, initialBalance), overdraftLimit(limit) {
-        Logger::log("Current Account created: " + accountNumber);
-    }
-
-    void deposit(double amount) override {
-        if (!AccountValidator::isValidAmount(amount)) {
-            Logger::logError("Invalid deposit amount");
-            return;
-        }
-        balance += amount;
-        Logger::log("Deposited: " + std::to_string(amount) + 
-                    ". New balance: " + std::to_string(balance));
-    }
+    CurrentAccount(const std::string& accNum, double initialBalance, 
+                   double limit, 
+                   std::unique_ptr<TransactionFeeStrategy> feeStrat = std::make_unique<NoFeeStrategy>())
+        : Account(accNum, initialBalance, std::move(feeStrat)), 
+          overdraftLimit(limit) {}
 
     void withdraw(double amount) override {
-        if (!AccountValidator::isValidAmount(amount)) {
-            Logger::logError("Invalid withdrawal amount");
-            return;
+        if (amount <= 0) {
+            throw std::invalid_argument("Withdrawal amount must be positive");
         }
-        if (!AccountValidator::hasEnoughBalance(balance, amount, overdraftLimit)) {
-            Logger::logError("Withdrawal exceeds overdraft limit");
-            return;
+        double fee = feeStrategy->calculateFee(amount);
+        if (amount + fee > balance + overdraftLimit) {
+            throw std::runtime_error("Exceeds overdraft limit");
         }
-        balance -= amount;
-        Logger::log("Withdrew: " + std::to_string(amount) + 
-                    ". New balance: " + std::to_string(balance));
+        balance -= (amount + fee);
+        std::cout << "Withdrew: " << amount 
+                  << ", Fee: " << fee 
+                  << ", New Balance: " << balance << std::endl;
+    }
+
+    std::string getAccountType() const override {
+        return "Current";
     }
 };
 
-// ATM with focused responsibility of account interaction
-class ATM {
-private:
-    Account* account;
-
-public:
-    ATM(Account* acc) : account(acc) {}
-
-    void deposit(double amount) {
-        account->deposit(amount);
-    }
-
-    void withdraw(double amount) {
-        account->withdraw(amount);
-    }
-
-    // Specific behavior handling
-    void applySpecificBehavior() {
-        SavingsAccount* savings = dynamic_cast<SavingsAccount*>(account);
-        if (savings) {
-            savings->applyInterest();
-        }
-    }
-};
-
-// Banking system manager with responsibility of account management
+// Banking system to manage accounts
 class BankingSystem {
 private:
     std::vector<std::unique_ptr<Account>> accounts;
@@ -172,7 +194,8 @@ public:
         accounts.push_back(std::move(account));
     }
 
-    Account* findAccount(const std::string& accountNumber) {
+    // New method to find account by number
+    Account* getAccountByNumber(const std::string& accountNumber) {
         for (auto& account : accounts) {
             if (account->getAccountNumber() == accountNumber) {
                 return account.get();
@@ -180,33 +203,64 @@ public:
         }
         return nullptr;
     }
+
+    // Extensible reporting method
+    void generateReport() {
+        std::cout << "--- Banking System Report ---" << std::endl;
+        for (const auto& account : accounts) {
+            std::cout << "Account Number: " << account->getAccountNumber() 
+                      << ", Type: " << account->getAccountType()
+                      << ", Balance: " << account->getBalance() << std::endl;
+        }
+    }
 };
 
 int main() {
-    // Create a banking system
     BankingSystem bank;
 
-    // Create accounts
-    auto savings = std::make_unique<SavingsAccount>("12345678", 1000.0, 5.0);
-    auto current = std::make_unique<CurrentAccount>("87654321", 500.0, 200.0);
+    // Create accounts with different fee and interest strategies
+    auto savingsAccount1 = std::make_unique<SavingsAccount>(
+        "12345", 1000.0, 5.0, 
+        std::make_unique<PercentageFeeStrategy>(0.5),  // 0.5% transaction fee
+        std::make_unique<SimpleInterestStrategy>()
+    );
+
+    auto savingsAccount2 = std::make_unique<SavingsAccount>(
+        "67890", 2000.0, 4.5, 
+        std::make_unique<FlatFeeStrategy>(2.0),  // $2 flat fee
+        std::make_unique<CompoundInterestStrategy>()
+    );
+
+    auto currentAccount = std::make_unique<CurrentAccount>(
+        "54321", 500.0, 200.0, 
+        std::make_unique<PercentageFeeStrategy>(1.0)  // 1% transaction fee
+    );
 
     // Add accounts to banking system
-    bank.addAccount(std::move(savings));
-    bank.addAccount(std::move(current));
+    bank.addAccount(std::move(savingsAccount1));
+    bank.addAccount(std::move(savingsAccount2));
+    bank.addAccount(std::move(currentAccount));
 
-    // Find the accounts
-    SavingsAccount* savingsAccount = dynamic_cast<SavingsAccount*>(bank.findAccount("12345678"));
-    CurrentAccount* currentAccount = dynamic_cast<CurrentAccount*>(bank.findAccount("87654321"));
+    // Demonstrate operations
+    try {
+        // Perform some transactions
+        bank.generateReport();
 
-    // Create ATMs for accounts
-    ATM savingsATM(savingsAccount);
-    ATM currentATM(currentAccount);
+        // Deposit and apply interest
+        SavingsAccount* savings = dynamic_cast<SavingsAccount*>(
+            bank.getAccountByNumber("12345")
+        );
+        if (savings) {
+            savings->deposit(100.0);
+            savings->applyInterest();
+        }
 
-    // Perform operations
-    savingsATM.deposit(200.0);
-    savingsATM.applySpecificBehavior();
-
-    currentATM.withdraw(600.0);
+        // Demonstrate extensibility
+        bank.generateReport();
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+    }
 
     return 0;
 }
